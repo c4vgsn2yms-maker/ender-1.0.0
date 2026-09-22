@@ -321,15 +321,22 @@ function pollGamepad(dt) {
     gamepadButton(gamepad, 7).value > 0.28 ||
     gamepadButton(gamepad, 10).pressed;
 
-  if (!state.started && (jump.pressed || menu.pressed) && !previous[0] && !previous[9]) {
+  const jumpPressed = jump.pressed && !previous[0];
+  const menuPressed = menu.pressed && !previous[9];
+  const activatePressed = jumpPressed || menuPressed;
+  let consumedJump = false;
+
+  if (!state.started && activatePressed) {
     beginGame(false);
-  } else if (state.finished && (jump.pressed || menu.pressed) && !previous[0] && !previous[9]) {
+    consumedJump = jumpPressed;
+  } else if (state.finished && activatePressed) {
     resetRun();
     state.started = true;
     showToast('Reach the Rift Gate');
+    consumedJump = jumpPressed;
   }
 
-  if (state.started && !state.finished && jump.pressed && !previous[0]) state.jumpBuffer = 0.14;
+  if (state.started && !state.finished && jumpPressed && !consumedJump) state.jumpBuffer = 0.14;
 
   if (cameraToggle.pressed && !previous[3]) {
     state.firstPerson = !state.firstPerson;
