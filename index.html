@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#10172a" />
+  <title>Ender 1.0.0 — 3D Platformer Base</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="game-shell">
+    <canvas id="game" aria-label="Ender 1.0.0 3D platform game"></canvas>
+
+    <section id="hud" aria-live="polite">
+      <div class="hud-group">
+        <div class="brand">ENDER <span>1.0.0</span></div>
+        <div class="pill">✦ <strong id="gem-count">0</strong>/<span id="gem-total">0</span></div>
+        <div class="pill">⏱ <strong id="timer">0:00.0</strong></div>
+        <div class="pill">↻ <strong id="deaths">0</strong></div>
+      </div>
+      <div class="hud-group hud-right">
+        <div class="pill"><strong id="camera-mode">THIRD PERSON</strong></div>
+      </div>
+    </section>
+
+    <div id="crosshair" aria-hidden="true">+</div>
+
+    <section id="objective">
+      <strong id="objective-title">Reach the Rift Gate</strong>
+      <span id="objective-text">Collect the sky shards along the way.</span>
+    </section>
+
+    <section id="help">
+      <div><kbd>WASD</kbd> move · <kbd>Space</kbd> jump · <kbd>Shift</kbd> sprint</div>
+      <div><kbd>V</kbd> first/third person · <kbd>R</kbd> restart · mouse to look</div>
+    </section>
+
+    <section id="start-panel" class="panel">
+      <div class="eyebrow">PLAYABLE FOUNDATION</div>
+      <h1>ENDER <span>1.0.0</span></h1>
+      <p>A fast 3D platformer base with switchable first-person and third-person play.</p>
+      <button id="start-button" type="button">Enter the Course</button>
+      <p class="small">Click the game to capture the mouse. Press Esc to release it.</p>
+    </section>
+
+    <section id="finish-panel" class="panel hidden">
+      <div class="eyebrow">COURSE COMPLETE</div>
+      <h2>You reached the Rift Gate.</h2>
+      <p id="finish-stats"></p>
+      <button id="play-again" type="button">Run It Again</button>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="webgl-error" class="panel hidden">
+      <h2>3D renderer unavailable</h2>
+      <p>This base needs WebGL. Try a current version of Chrome, Edge, Firefox, Safari, or Opera GX with hardware acceleration enabled.</p>
+    </div>
+  </div>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
