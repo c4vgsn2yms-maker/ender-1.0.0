@@ -18,12 +18,27 @@ https://c4vgsn2yms-maker.github.io/ender-1.0.0/
 - **R** — reset to the current spawn
 - **Esc** — release the mouse
 
+### Controller
+
+Standard-mapping Xbox, PlayStation, Switch-style, and compatible browser gamepads use:
+
+- **Left stick / D-pad** — move
+- **Right stick** — look / rotate camera
+- **A / Cross** — jump
+- **LB / RB / LT / RT / L3** — sprint
+- **Y / Triangle** — toggle first-person / third-person
+- **View / Share** — reset to the current spawn
+- **Start / Options** — begin or replay the course
+
+Controller input and keyboard/mouse input can be used together.
+
 ## Current base
 
 - Original 3D platform course
 - Third-person platforming camera
 - First-person mode
-- Mouse-look and camera-relative movement
+- Mouse/right-stick look and camera-relative movement
+- Standard browser Gamepad API controller support
 - Jumping, sprinting, gravity and platform collisions
 - Moving platforms
 - Sky-shard collectibles
