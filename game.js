@@ -250,6 +250,119 @@ const state = {
 ui.gemTotal.textContent = String(gems.length);
 const keys = new Set();
 
+const gamepadInput = {
+  index: null,
+  id: '',
+  moveX: 0,
+  moveZ: 0,
+  lookX: 0,
+  lookY: 0,
+  sprint: false,
+  jumpHeld: false,
+  prevButtons: []
+};
+const GAMEPAD_DEADZONE = 0.18;
+
+function applyDeadzone(value, deadzone = GAMEPAD_DEADZONE) {
+  const magnitude = Math.abs(value);
+  if (magnitude <= deadzone) return 0;
+  return Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
+}
+
+function gamepadButton(gamepad, index) {
+  const button = gamepad?.buttons?.[index];
+  return button ? { pressed: button.pressed || button.value > 0.5, value: button.value } : { pressed: false, value: 0 };
+}
+
+function pollGamepad(dt) {
+  if (!navigator.getGamepads) return;
+  const pads = navigator.getGamepads();
+  let gamepad = gamepadInput.index !== null ? pads[gamepadInput.index] : null;
+  if (!gamepad) gamepad = Array.from(pads).find(Boolean) || null;
+
+  if (!gamepad) {
+    gamepadInput.moveX = 0;
+    gamepadInput.moveZ = 0;
+    gamepadInput.lookX = 0;
+    gamepadInput.lookY = 0;
+    gamepadInput.sprint = false;
+    gamepadInput.jumpHeld = false;
+    gamepadInput.prevButtons = [];
+    return;
+  }
+
+  gamepadInput.index = gamepad.index;
+  gamepadInput.id = gamepad.id || 'Controller';
+
+  const dpadX = (gamepadButton(gamepad, 15).pressed ? 1 : 0) - (gamepadButton(gamepad, 14).pressed ? 1 : 0);
+  const dpadZ = (gamepadButton(gamepad, 12).pressed ? 1 : 0) - (gamepadButton(gamepad, 13).pressed ? 1 : 0);
+  const stickX = applyDeadzone(gamepad.axes?.[0] ?? 0);
+  const stickY = applyDeadzone(gamepad.axes?.[1] ?? 0);
+  gamepadInput.moveX = Math.abs(dpadX) > Math.abs(stickX) ? dpadX : stickX;
+  gamepadInput.moveZ = Math.abs(dpadZ) > Math.abs(stickY) ? dpadZ : -stickY;
+
+  gamepadInput.lookX = applyDeadzone(gamepad.axes?.[2] ?? 0, 0.14);
+  gamepadInput.lookY = applyDeadzone(gamepad.axes?.[3] ?? 0, 0.14);
+  state.yaw -= gamepadInput.lookX * 2.55 * dt;
+  state.pitch -= gamepadInput.lookY * 2.1 * dt;
+  state.pitch = THREE.MathUtils.clamp(state.pitch, -1.18, 1.05);
+
+  const jump = gamepadButton(gamepad, 0);
+  const cameraToggle = gamepadButton(gamepad, 3);
+  const reset = gamepadButton(gamepad, 8);
+  const menu = gamepadButton(gamepad, 9);
+  const previous = gamepadInput.prevButtons;
+
+  gamepadInput.jumpHeld = jump.pressed;
+  gamepadInput.sprint =
+    gamepadButton(gamepad, 4).pressed ||
+    gamepadButton(gamepad, 5).pressed ||
+    gamepadButton(gamepad, 6).value > 0.28 ||
+    gamepadButton(gamepad, 7).value > 0.28 ||
+    gamepadButton(gamepad, 10).pressed;
+
+  if (!state.started && (jump.pressed || menu.pressed) && !previous[0] && !previous[9]) {
+    beginGame(false);
+  } else if (state.finished && (jump.pressed || menu.pressed) && !previous[0] && !previous[9]) {
+    resetRun();
+    state.started = true;
+    showToast('Reach the Rift Gate');
+  }
+
+  if (state.started && !state.finished && jump.pressed && !previous[0]) state.jumpBuffer = 0.14;
+
+  if (cameraToggle.pressed && !previous[3]) {
+    state.firstPerson = !state.firstPerson;
+    updateCameraMode();
+  }
+
+  if (state.started && !state.finished && reset.pressed && !previous[8]) resetPlayer(true);
+
+  gamepadInput.prevButtons = gamepad.buttons.map(button => button.pressed || button.value > 0.5);
+}
+
+window.addEventListener('gamepadconnected', event => {
+  gamepadInput.index = event.gamepad.index;
+  gamepadInput.id = event.gamepad.id || 'Controller';
+  gamepadInput.prevButtons = [];
+  showToast('Controller connected');
+});
+
+window.addEventListener('gamepaddisconnected', event => {
+  if (gamepadInput.index === event.gamepad.index) {
+    gamepadInput.index = null;
+    gamepadInput.id = '';
+    gamepadInput.prevButtons = [];
+    gamepadInput.moveX = 0;
+    gamepadInput.moveZ = 0;
+    gamepadInput.lookX = 0;
+    gamepadInput.lookY = 0;
+    gamepadInput.sprint = false;
+    gamepadInput.jumpHeld = false;
+    showToast('Controller disconnected');
+  }
+});
+
 function overlapsPlatform(pos, p) {
   const minX = pos.x - PLAYER.radius;
   const maxX = pos.x + PLAYER.radius;
@@ -341,15 +454,17 @@ function hitHazard() {
   resetPlayer(true);
 }
 
-function beginGame() {
+function beginGame(captureMouse = true) {
   state.started = true;
+  state.finished = false;
   ui.startPanel.classList.add('hidden');
+  ui.finishPanel.classList.add('hidden');
   canvas.focus();
-  if (canvas.requestPointerLock) canvas.requestPointerLock();
+  if (captureMouse && canvas.requestPointerLock) canvas.requestPointerLock();
   showToast('Reach the Rift Gate');
 }
 
-ui.startButton.addEventListener('click', beginGame);
+ui.startButton.addEventListener('click', () => beginGame(true));
 ui.playAgain.addEventListener('click', () => {
   resetRun();
   state.started = true;
@@ -404,14 +519,16 @@ function updatePlayer(dt) {
   state.jumpBuffer = Math.max(0, state.jumpBuffer - dt);
   state.coyote = state.grounded ? 0.11 : Math.max(0, state.coyote - dt);
 
-  const inputX = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  const inputZ = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+  const keyboardX = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  const keyboardZ = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+  const inputX = THREE.MathUtils.clamp(keyboardX + gamepadInput.moveX, -1, 1);
+  const inputZ = THREE.MathUtils.clamp(keyboardZ + gamepadInput.moveZ, -1, 1);
   forward.set(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
   right.set(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
   wish.set(0, 0, 0).addScaledVector(forward, inputZ).addScaledVector(right, inputX);
   if (wish.lengthSq() > 1) wish.normalize();
 
-  const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight') || gamepadInput.sprint;
   const maxSpeed = sprinting ? 10.2 : 7.3;
   const accel = state.grounded ? 38 : 15;
   const targetX = wish.x * maxSpeed;
@@ -431,7 +548,7 @@ function updatePlayer(dt) {
     state.coyote = 0;
     state.jumpBuffer = 0;
   }
-  if (!keys.has('Space') && state.velocity.y > 4.2) state.velocity.y *= Math.pow(0.72, dt * 60);
+  if (!keys.has('Space') && !gamepadInput.jumpHeld && state.velocity.y > 4.2) state.velocity.y *= Math.pow(0.72, dt * 60);
 
   state.velocity.y -= 27 * dt;
   state.velocity.y = Math.max(state.velocity.y, -24);
@@ -551,6 +668,7 @@ function animate(now) {
     state.elapsed += rawDt;
     ui.timer.textContent = formatTime(state.elapsed);
   }
+  pollGamepad(rawDt);
   updateMovingPlatforms(t);
   updateWorldAnimation(t, rawDt);
   updatePlayer(rawDt);
